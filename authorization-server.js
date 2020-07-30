@@ -54,7 +54,93 @@ app.use(bodyParser.urlencoded({ extended: true }))
 Your code here
 */
 app.get('/authorize', (req, res ) => {
-	res.end(200)
+	const clientId = req.query.clientId
+	const client = clients[clientId]
+	if (!client) {
+		res.status(401).send("Error: client not authorized")
+		return
+	}
+	if (
+		typeof req.query.scope !== 'string' ||
+		!containsAll(client.scopes, req.query.scopes.split(" "))
+	) {
+		res.status(401).send("Error invalid scopes requested")
+	}
+	const requestId = randomString()
+	request[requestId] = req.query
+	res.render('login', {
+		client,
+		scope: req.query.scope,
+		requestId
+	})
+
+	const clientReq = request[requestId] 
+	delete request[requestId]
+
+	if (!clientReq){
+		req.status(401).send("Error invalid user request")
+		return
+	}
+
+	const code = randomString()
+	authorizationCodes[code] = {clientReq, userName}
+	const redirectUri = url.parse(clientReq.redirect_uri)
+	redirect_uri.query = {
+		code,
+		state: clientReq.state
+	}
+	res.redirect(url.format(redirectUri))
+})
+
+app.post('/token', (req, res) => {
+	let authCredentials = req.headers.authorization
+	if (!authorizationCodes) {
+		res.status(401).send("Error: not authorized")
+		return 
+	}
+
+	const {clientId, clientSecret} = decodeAuthCredentials(authCredentials)
+	const client = clients[clientId]
+	if (!client || client.clientSecret !== clientSecret) {
+		res.status(401).send("Error: client not authorized")
+		return 
+	}
+
+	const code = req.body.code
+	if (!code || authorizationCodes[code]) {
+		res.status(401).send("Error: invalid code")
+		return 	
+	}
+
+	const {clientReq, userName} = authorizationCodes[code]
+	delete authorizationCodes[code]
+
+	const token = jwt.sign(
+		{
+			userName,
+			scope: clientReq.scope
+		},
+		config.privateKey,
+		{
+			algorithm: "RS256",
+			expiresIn: 300,
+			issuer: "http//localhost:" + config.port
+		}
+	)
+	res.json({
+		access_token: token,
+		token_type: "Bearer",
+		scope: clientReq.scope
+	})
+})
+
+app.post('/approve', (req,res) => {
+	const {userName, password, requestId} = req.body
+	if (!userName || users[userName] !== password) {
+		res.status(401).send("Error: User not authorized")
+		return
+	}
+
 })
 
 const server = app.listen(config.port, "localhost", function () {
