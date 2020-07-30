@@ -2,6 +2,7 @@ const fs = require("fs")
 const express = require("express")
 const bodyParser = require("body-parser")
 const jwt = require("jsonwebtoken")
+const url = require('url');
 const {
 	randomString,
 	containsAll,
@@ -50,9 +51,7 @@ app.use(timeout)
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-/*
-Your code here
-*/
+
 app.get('/authorize', (req, res ) => {
 	const clientId = req.query.client_id
 	const client = clients[clientId]
@@ -65,9 +64,10 @@ app.get('/authorize', (req, res ) => {
 		!containsAll(client.scopes, req.query.scope.split(" "))
 	) {
 		res.status(401).send("Error: invalid scopes requested")
+		return
 	}
 	const requestId = randomString()
-	request[requestId] = req.query
+	requests[requestId] = req.query
 	res.render('login', {
 		client,
 		scope: req.query.scope,
@@ -75,28 +75,27 @@ app.get('/authorize', (req, res ) => {
 	})
 })
 
-app.post('/approve', (req,res) => {
-	const {userName, password, requestId} = req.body
+app.post("/approve", (req, res) => {
+	const { userName, password, requestId } = req.body
 	if (!userName || users[userName] !== password) {
 		res.status(401).send("Error: User not authorized")
 		return
 	}
 	const clientReq = requests[requestId] 
 	delete requests[requestId]
-
 	if (!clientReq){
-		req.status(401).send("Error invalid user request")
+		res.status(401).send("Error invalid user request")
 		return
 	}
-
 	const code = randomString()
-	authorizationCodes[code] = {clientReq, userName}
+	authorizationCodes[code] = { clientReq, userName }
 	const redirectUri = url.parse(clientReq.redirect_uri)
 	redirectUri.query = {
 		code,
-		state: clientReq.state
+		state: clientReq.state,
 	}
 	res.redirect(url.format(redirectUri))
+	res.status(200)
 })
 
 app.post('/token', (req, res) => {
@@ -105,23 +104,19 @@ app.post('/token', (req, res) => {
 		res.status(401).send("Error: not authorized")
 		return 
 	}
-
-	const {clientId, clientSecret} = decodeAuthCredentials(authCredentials)
+	const { clientId, clientSecret } = decodeAuthCredentials(authCredentials)
 	const client = clients[clientId]
 	if (!client || client.clientSecret !== clientSecret) {
 		res.status(401).send("Error: client not authorized")
 		return 
 	}
-
 	const code = req.body.code
-	if (!code || authorizationCodes[code]) {
+	if (!code || !authorizationCodes[code]) {
 		res.status(401).send("Error: invalid code")
 		return 	
 	}
-
 	const {clientReq, userName} = authorizationCodes[code]
 	delete authorizationCodes[code]
-
 	const token = jwt.sign(
 		{
 			userName,
@@ -131,7 +126,7 @@ app.post('/token', (req, res) => {
 		{
 			algorithm: "RS256",
 			expiresIn: 300,
-			issuer: "http//localhost:" + config.port,
+			issuer: "http://localhost:" + config.port,
 		}
 	)
 	res.json({

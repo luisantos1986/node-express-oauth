@@ -24,7 +24,7 @@ it("/approve route verifies the userName and password credentials @authorization
 			assert.equal(
 				[200, 302, 408].indexOf(res.status) >= 0,
 				true,
-				"The /approve route should return a 200 status for the correct username and password"
+				"The /approve route should return a 200 status for the correct username and password "+res.error
 			)
 
 			return request(app).post("/approve").send({
