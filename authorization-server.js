@@ -81,8 +81,8 @@ app.post('/approve', (req,res) => {
 		res.status(401).send("Error: User not authorized")
 		return
 	}
-	const clientReq = request[requestId] 
-	delete request[requestId]
+	const clientReq = requests[requestId] 
+	delete requests[requestId]
 
 	if (!clientReq){
 		req.status(401).send("Error invalid user request")
@@ -92,7 +92,7 @@ app.post('/approve', (req,res) => {
 	const code = randomString()
 	authorizationCodes[code] = {clientReq, userName}
 	const redirectUri = url.parse(clientReq.redirect_uri)
-	redirect_uri.query = {
+	redirectUri.query = {
 		code,
 		state: clientReq.state
 	}
@@ -101,7 +101,7 @@ app.post('/approve', (req,res) => {
 
 app.post('/token', (req, res) => {
 	let authCredentials = req.headers.authorization
-	if (!authorizationCodes) {
+	if (!authCredentials) {
 		res.status(401).send("Error: not authorized")
 		return 
 	}
@@ -125,13 +125,13 @@ app.post('/token', (req, res) => {
 	const token = jwt.sign(
 		{
 			userName,
-			scope: clientReq.scope
+			scope: clientReq.scope,
 		},
 		config.privateKey,
 		{
 			algorithm: "RS256",
 			expiresIn: 300,
-			issuer: "http//localhost:" + config.port
+			issuer: "http//localhost:" + config.port,
 		}
 	)
 	res.json({
