@@ -54,7 +54,7 @@ app.use(bodyParser.urlencoded({ extended: true }))
 Your code here
 */
 app.get('/authorize', (req, res ) => {
-	const clientId = req.query.clientId
+	const clientId = req.query.client_Id
 	const client = clients[clientId]
 	if (!client) {
 		res.status(401).send("Error: client not authorized")
@@ -62,18 +62,25 @@ app.get('/authorize', (req, res ) => {
 	}
 	if (
 		typeof req.query.scope !== 'string' ||
-		!containsAll(client.scopes, req.query.scopes.split(" "))
+		!containsAll(client.scopes, req.query.scope.split(" "))
 	) {
-		res.status(401).send("Error invalid scopes requested")
+		res.status(401).send("Error: invalid scopes requested")
 	}
 	const requestId = randomString()
 	request[requestId] = req.query
 	res.render('login', {
 		client,
 		scope: req.query.scope,
-		requestId
+		requestId,
 	})
+})
 
+app.post('/approve', (req,res) => {
+	const {userName, password, requestId} = req.body
+	if (!userName || users[userName] !== password) {
+		res.status(401).send("Error: User not authorized")
+		return
+	}
 	const clientReq = request[requestId] 
 	delete request[requestId]
 
@@ -132,15 +139,6 @@ app.post('/token', (req, res) => {
 		token_type: "Bearer",
 		scope: clientReq.scope
 	})
-})
-
-app.post('/approve', (req,res) => {
-	const {userName, password, requestId} = req.body
-	if (!userName || users[userName] !== password) {
-		res.status(401).send("Error: User not authorized")
-		return
-	}
-
 })
 
 const server = app.listen(config.port, "localhost", function () {
