@@ -136,25 +136,6 @@ app.post('/token', (req, res) => {
 	})
 })
 
-app.get('/user-info', (req, res ) => {
-	const headers = req.headers.authorization
-	if (!headers) {
-		res.status(401).send("Error: invalid token")
-		return
-	}
-	const token = headers.slice(" ")
-
-	jwt.verify(token, config.privateKey, { algorithms: ['RS256'] },(err, payload) => {
-		if (err) {
-			res.status(401).send("jwt verify user-info "+err)
-		} else {
-			res.state(200).send(payload)
-		}
-
-	})
-
-})
-
 const server = app.listen(config.port, "localhost", function () {
 	var host = server.address().address
 	var port = server.address().port
